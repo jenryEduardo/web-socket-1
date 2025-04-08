@@ -40,6 +40,13 @@ func (c *WebSocketController) HandleWebSocket(w http.ResponseWriter, r *http.Req
     }
 }
 
+func (c *WebSocketController) SendSensorStatus(status domain.SensorStatus) error {
+    c.WebSocketServer.BroadcastSensor <- status
+    return nil
+}
+
+
+
 // SendPedido envía un pedido a través del WebSocket.
 func (c *WebSocketController) SendPedido(pedido domain.Pedido) error {
     c.WebSocketServer.Broadcast <- pedido

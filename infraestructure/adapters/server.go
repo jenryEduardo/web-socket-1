@@ -6,37 +6,54 @@ import (
     "websocket/domain"
 )
 
-// WebSocketServer gestiona las conexiones WebSocket.
 type WebSocketServer struct {
-    Clients    map[*websocket.Conn]bool
-    Register   chan *websocket.Conn
-    Unregister chan *websocket.Conn
-    Broadcast  chan domain.Pedido
+    Clients         map[*websocket.Conn]bool
+    Register        chan *websocket.Conn
+    Unregister      chan *websocket.Conn
+    Broadcast       chan domain.Pedido
+    BroadcastSensor chan domain.SensorStatus
 }
 
-// NewWebSocketServer crea una nueva instancia de WebSocketServer.
 func NewWebSocketServer() *WebSocketServer {
     return &WebSocketServer{
-        Clients:    make(map[*websocket.Conn]bool),
-        Register:   make(chan *websocket.Conn),
-        Unregister: make(chan *websocket.Conn),
-        Broadcast:  make(chan domain.Pedido),
+        Clients:         make(map[*websocket.Conn]bool),
+        Register:        make(chan *websocket.Conn),
+        Unregister:      make(chan *websocket.Conn),
+        Broadcast:       make(chan domain.Pedido),
+        BroadcastSensor: make(chan domain.SensorStatus),
     }
 }
 
-// Run inicia el servidor WebSocket y maneja la conexión de los clientes.
 func (s *WebSocketServer) Run() {
     for {
         select {
         case conn := <-s.Register:
             s.Clients[conn] = true
+
         case conn := <-s.Unregister:
             delete(s.Clients, conn)
+
         case pedido := <-s.Broadcast:
             for client := range s.Clients {
-                err := client.WriteJSON(pedido)
+                err := client.WriteJSON(map[string]interface{}{
+                    "type": "pedido",
+                    "data": pedido,
+                })
                 if err != nil {
-                    log.Println("Error al enviar mensaje al cliente:", err)
+                    log.Println("Error al enviar pedido:", err)
+                    client.Close()
+                    delete(s.Clients, client)
+                }
+            }
+
+        case sensor := <-s.BroadcastSensor:
+            for client := range s.Clients {
+                err := client.WriteJSON(map[string]interface{}{
+                    "type": "sensor",
+                    "data": sensor,
+                })
+                if err != nil {
+                    log.Println("Error al enviar sensor:", err)
                     client.Close()
                     delete(s.Clients, client)
                 }
